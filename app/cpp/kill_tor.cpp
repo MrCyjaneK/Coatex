@@ -15,7 +15,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <android/log.h>
-
+#include <string.h>
 extern "C"
 {
 

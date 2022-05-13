@@ -181,11 +181,11 @@ public class ImportIdActivity extends AppCompatActivity {
 
         alertDialog.show();
     }
-
+    @SuppressWarnings("deprecation")
     private class ImportID extends AsyncTask<String, Void, Boolean> {
 
         private String mPassword;
-
+        @SuppressWarnings("deprecation")
         public ImportID(String password) {
             mPassword = password;
         }

@@ -1,17 +1,18 @@
 apply plugin: 'com.android.application'
 apply plugin: 'realm-android'
 apply plugin: 'com.mikepenz.aboutlibraries.plugin'
+apply plugin: 'kotlin-android'
 
 android {
-    compileSdkVersion 28
-    buildToolsVersion '28.0.3'
+    compileSdkVersion 30
+    buildToolsVersion "30.0.3"
 
     defaultConfig {
         applicationId "com.ivor.coatex"
         minSdkVersion 21
-        targetSdkVersion 28
-        versionCode 30
-        versionName "1.3"
+        targetSdkVersion 30
+        versionCode 31
+        versionName "3.0.0"
         vectorDrawables.useSupportLibrary = true
         multiDexEnabled true
     }
@@ -40,6 +41,18 @@ android {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
+
+    packagingOptions {
+        exclude 'META-INF/DEPENDENCIES'
+        exclude 'META-INF/LICENSE'
+        exclude 'META-INF/LICENSE.txt'
+        exclude 'META-INF/license.txt'
+        exclude 'META-INF/NOTICE'
+        exclude 'META-INF/NOTICE.txt'
+        exclude 'META-INF/notice.txt'
+        exclude 'META-INF/ASL2.0'
+        exclude("META-INF/*.kotlin_module")
+    }
 }
 
 //configurations.all {
@@ -49,10 +62,26 @@ android {
 //}
 
 dependencies {
-    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    //implementation fileTree(dir: 'libs', include: ['*.jar'])
 
-    implementation files('libs/core-1.52.0.0.jar')
-    implementation files('libs/prov-1.52.0.0.jar')
+    // implementation files('libs/core-1.52.0.0.jar')
+    // implementation files('libs/prov-1.52.0.0.jar')
+    //compile fileTree(dir: 'libs', include: ['*.jar'])
+    // https://mvnrepository.com/artifact/org.apache.directory.studio/org.apache.commons.codec
+    implementation 'org.apache.directory.studio:org.apache.commons.codec:1.8'
+    // https://mvnrepository.com/artifact/com.madgag.spongycastle/core
+    implementation 'com.madgag.spongycastle:core:1.58.0.0'
+    // https://mvnrepository.com/artifact/com.madgag.spongycastle/prov
+    implementation 'com.madgag.spongycastle:prov:1.58.0.0'
+    // https://mvnrepository.com/artifact/org.apache.pulsar/pulsar-client-messagecrypto-bc
+    implementation 'org.apache.pulsar:pulsar-client-messagecrypto-bc:2.10.0'
+
+    // https://mvnrepository.com/artifact/org.bouncycastle/bcprov-jdk15on
+    implementation 'org.bouncycastle:bcprov-ext-jdk15to18:1.70'
+    // compile group: 'org.bouncycastle', name: '', version: ''
+
+    // https://mvnrepository.com/artifact/net.i2p.crypto/eddsa
+    implementation 'net.i2p.crypto:eddsa:0.3.0'
 
     implementation 'androidx.appcompat:appcompat:1.1.0'
     implementation 'androidx.legacy:legacy-support-v4:1.0.0'
@@ -84,4 +113,13 @@ dependencies {
     implementation 'com.jarvanmo:exoplayerview:2.1.5'
     implementation 'com.novoda:merlin:1.2.1'
     implementation "com.mikepenz:aboutlibraries:8.1.1"
+
+    implementation 'com.google.zxing:core:3.2.0'
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
+
+    testImplementation 'junit:junit:4.12'
+    // implementation 'com.android.support:appcompat-v7:23.0.1'
+    // implementation 'com.android.support:design:23.0.1'
+    // implementation 'com.android.support:recyclerview-v7:23.0.1'
+    // implementation 'com.android.support:cardview-v7:23.0.1'
 }

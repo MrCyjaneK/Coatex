@@ -244,7 +244,7 @@ public class MainActivity extends AppCompatActivity {
 
                 String id = tokens[1].toLowerCase();
 
-                if (id.length() != 16) {
+                if (id.length() != 56) {
                     snack(getString(R.string.invalid_qr_code));
                     return;
                 }
@@ -465,7 +465,7 @@ public class MainActivity extends AppCompatActivity {
             button.setOnClickListener(view1 -> {
 
                 String id1 = idEd.getText().toString().trim();
-                if (id1.length() != 16) {
+                if (id1.length() != 56) {
                     snack(getString(R.string.invalid_id));
                     idEd.setError(getString(R.string.invalid_id));
                     return;

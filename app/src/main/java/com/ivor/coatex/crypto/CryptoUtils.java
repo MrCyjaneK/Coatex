@@ -2,7 +2,7 @@ package com.ivor.coatex.crypto;
 
 import com.ivor.coatex.utils.Util;
 
-import org.spongycastle.x509.X509V1CertificateGenerator;
+import org.bouncycastle.x509.X509V3CertificateGenerator;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -55,8 +55,8 @@ public class CryptoUtils {
         Date validityBeginDate = new Date(System.currentTimeMillis() - 24 * 60 * 60 * 1000);
 // in 2 years
         Date validityEndDate = new Date(System.currentTimeMillis() + (2 * 365 * 24 * 60 * 60 * 1000));
-
-        X509V1CertificateGenerator certGen = new X509V1CertificateGenerator();
+        @SuppressWarnings("deprecation")
+        X509V3CertificateGenerator certGen = new X509V3CertificateGenerator();
         X500Principal dnName = new X500Principal(dn);
         certGen.setSerialNumber(BigInteger.valueOf(System.currentTimeMillis()));
         certGen.setSubjectDN(dnName);

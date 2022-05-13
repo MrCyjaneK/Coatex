@@ -10,49 +10,50 @@
 
 package com.ivor.coatex.tor;
 
+import static java.lang.System.arraycopy;
+
 import android.content.Context;
-import android.os.Build;
 import android.util.Base64;
 import android.util.Log;
 
-import com.ivor.coatex.R;
-import com.ivor.coatex.crypto.AdvancedCrypto;
 import com.ivor.coatex.utils.Util;
 
+import net.i2p.crypto.eddsa.EdDSAEngine;
+import net.i2p.crypto.eddsa.EdDSAPrivateKey;
+import net.i2p.crypto.eddsa.EdDSAPublicKey;
+import net.i2p.crypto.eddsa.EdDSASecurityProvider;
+import net.i2p.crypto.eddsa.spec.EdDSANamedCurveSpec;
+import net.i2p.crypto.eddsa.spec.EdDSANamedCurveTable;
+import net.i2p.crypto.eddsa.spec.EdDSAParameterSpec;
+import net.i2p.crypto.eddsa.spec.EdDSAPrivateKeySpec;
+import net.i2p.crypto.eddsa.spec.EdDSAPublicKeySpec;
+
 import org.apache.commons.codec.binary.Base32;
-import org.apache.commons.codec.digest.DigestUtils;
-import org.spongycastle.asn1.ASN1OutputStream;
-import org.spongycastle.asn1.x509.RSAPublicKeyStructure;
-import org.spongycastle.jce.provider.BouncyCastleProvider;
+import org.spongycastle.crypto.Digest;
+import org.spongycastle.crypto.digests.SHA3Digest;
+
+
 
 import java.io.BufferedReader;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintWriter;
-import java.math.BigInteger;
-import java.nio.charset.StandardCharsets;
+import java.nio.charset.Charset;
 import java.security.InvalidKeyException;
 import java.security.KeyFactory;
+import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
-import java.security.PublicKey;
 import java.security.Security;
 import java.security.Signature;
-import java.security.interfaces.RSAPrivateKey;
-import java.security.interfaces.RSAPublicKey;
 import java.security.spec.InvalidKeySpecException;
-import java.security.spec.PKCS8EncodedKeySpec;
-import java.security.spec.RSAPrivateKeySpec;
-import java.security.spec.RSAPublicKeySpec;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.crypto.BadPaddingException;
-import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
 
@@ -62,7 +63,7 @@ public class Tor {
     private static String tordirname = "tordata";
     private static String torservdir = "torserv";
     private static String torCfg = "torcfg";
-    private static int HIDDEN_SERVICE_VERSION = 2;
+    private static int HIDDEN_SERVICE_VERSION = 3;
     private static Tor instance = null;
     private Context mContext;
     private static int mSocksPort = 9151;
@@ -107,17 +108,18 @@ public class Tor {
             @Override
             public void run() {
                 try {
-                    log("kill");
-                    Native.killTor();
+                    test();
+                    // log("kill");
+                    // Native.killTor();
 
-                    log("install");
-                    extractFile(mContext, R.raw.tor, torname);
+                    // log("install");
+                    // extractFile(mContext, R.raw.tor, torname);
 
                     //log("delete on exit");
                     //context.getFileStreamPath(torname).deleteOnExit();
 
-                    log("set executable");
-                    mContext.getFileStreamPath(torname).setExecutable(true);
+                    // log("set executable");
+                    // mContext.getFileStreamPath(torname).setExecutable(true);
 
                     log("make dir");
                     File tordir = new File(mTorDir, tordirname);
@@ -144,22 +146,27 @@ public class Tor {
 
                     log("start: " + new File(torname).getAbsolutePath());
 
-                    String[] command = new String[]{
-                            mContext.getFileStreamPath(torname).getAbsolutePath(),
-                            "-f", mContext.getFileStreamPath(torCfg).getAbsolutePath()
-                    };
+                    // String[] command = new String[]{
+                    //        mContext.getFileStreamPath(torname).getAbsolutePath(),
+                    //        "-f", mContext.getFileStreamPath(torCfg).getAbsolutePath()
+                    //};
 
-                    StringBuilder sb = new StringBuilder();
-                    for (String s : command) {
-                        sb.append(s);
-                        sb.append(" ");
-                    }
+                    //StringBuilder sb = new StringBuilder();
+                    //for (String s : command) {
+                    //    sb.append(s);
+                    //    sb.append(" ");
+                    //}
 
-                    log("Command: " + sb.toString());
+                    // log("Command: " + sb.toString());
 
                     mRunning.set(true);
+                    String dir = mContext.getApplicationInfo().nativeLibraryDir;
+                    log(dir);
 
-                    mProcessTor = Runtime.getRuntime().exec(command);
+                    Process tor;
+                    mProcessTor = new ProcessBuilder().directory(new File(dir)).command("./libtor.so", "-f", mContext.getFileStreamPath("torcfg").getAbsolutePath()).redirectErrorStream(true).start();
+
+                    // mProcessTor = Runtime.getRuntime().exec(command);
                     BufferedReader torReader = new BufferedReader(new InputStreamReader(mProcessTor.getInputStream()));
                     while (true) {
                         final String line = torReader.readLine();
@@ -210,19 +217,21 @@ public class Tor {
         return instance;
     }
 
-    static String computeID(RSAPublicKeySpec pubKey) {
-        RSAPublicKeyStructure myKey = new RSAPublicKeyStructure(pubKey.getModulus(), pubKey.getPublicExponent());
-        ByteArrayOutputStream bs = new ByteArrayOutputStream();
-        ASN1OutputStream as = new ASN1OutputStream(bs);
-        try {
-            as.writeObject(myKey.toASN1Object());
-        } catch (IOException ex) {
-            // TODO: error handling? ignore error?
-            throw new Error(ex);
-        }
-        byte[] b = bs.toByteArray();
-        b = DigestUtils.getSha1Digest().digest(b);
-        return new Base32().encodeAsString(b).toLowerCase().substring(0, 16);
+    static String computeID(byte[] pubkey) {
+        // RSAPublicKeyStructure myKey = new RSAPublicKeyStructure(pubkey.getModulus(), pubkey.getPublicExponent());
+
+        Digest digest = new SHA3Digest(256);
+        byte[] label = ".onion checksum".getBytes(Charset.forName("US-ASCII"));
+        digest.update(label, 0, label.length);
+        digest.update(pubkey, 0, pubkey.length);
+        digest.update((byte) 3); // ONION_HS_PROTOCOL_VERSION
+        byte[] checksum = new byte[digest.getDigestSize()];
+        digest.doFinal(checksum, 0);
+        byte[] address = new byte[pubkey.length + 2 + 1]; // 2 = ONION_CHECKSUM_BYTES
+        arraycopy(pubkey, 0, address, 0, pubkey.length);
+        arraycopy(checksum, 0, address, pubkey.length, 2); // 2 = ONION_CHECKSUM_BYTES
+        address[address.length - 1] = 3; // ONION_HS_PROTOCOL_VERSION
+        return new Base32().encode(address).toString();
     }
 
     public static int getHiddenServicePort() {
@@ -295,74 +304,122 @@ public class Tor {
     }
 
     private KeyFactory getKeyFactory() {
-//        if (Security.getProvider("BC") == null) {
-        Security.addProvider(new BouncyCastleProvider());
-//        }
+        if (Security.getProvider("EdDSA") == null) {
+            Security.addProvider(new EdDSASecurityProvider());
+        }
         try {
-            if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.M) {
-                return KeyFactory.getInstance("RSA", "BC");
-            } else {
-                return KeyFactory.getInstance("RSA");
-            }
+            return KeyFactory.getInstance("EdDSA", "EdDSA");
         } catch (Exception ex) {
             throw new Error(ex);
         }
     }
+    private static byte[] sha512(byte[] input) {
+        MessageDigest mDigest = null;
+        try {
+            mDigest = MessageDigest.getInstance("SHA-512");
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        }
+        byte[] result = mDigest.digest(input);
+        return result;
+    }
+    //public String readPrivateKeyFile() {
+    //    return Util.filestr(new File(getServiceDir(), HIDDEN_SERVICE_VERSION == 3 ? "hs_ed25519_secret_key" : "private_key"));
+    //}
+    private static final EdDSANamedCurveSpec CURVE_SPEC =
+            EdDSANamedCurveTable.getByName("Ed25519");
 
-    public String readPrivateKeyFile() {
-        return Util.filestr(new File(getServiceDir(), HIDDEN_SERVICE_VERSION == 3 ? "hs_ed25519_secret_key" : "private_key"));
+    public byte[] readPrivateKeyFile() {
+        byte[] full1 = Util.filebin(new File(getServiceDir(), "hs_ed25519_secret_key"));
+        byte[] full2 = Arrays.copyOfRange(full1, 32, 64);
+        //log("full1: "+full1);
+        //String full = full1.replace("== ed25519v1-secret: type0 ==\00\00\00", "");
+        //log("full2: "+full);
+
+
+        Base32 b32 = new Base32();
+        // byte[] full3 = b32.encode(full2);
+
+
+        //byte[] fullb = full.getBytes();
+
+
+        // EdDSAPrivateKey pkey = new EdDSAPrivateKey(new EdDSAPrivateKeySpec(full3, CURVE_SPEC));
+        // byte[] hash = sha512(Arrays.copyOfRange(pkey.getEncoded(), 0, 32));
+        // hash[0] &= 248;
+        // hash[31] &= 127;
+        // hash[31] |= 64;
+
+
+        log(CURVE_SPEC.toString());
+        log(String.valueOf(CURVE_SPEC.getCurve().getField().getb()));
+        log(String.valueOf(full1.length));
+        log(String.valueOf(full2.length));
+        //log(String.valueOf(full3.length));
+        //log(pkey.toString());
+        //return pkey.getEncoded();
+        return full2;
     }
 
-    public RSAPrivateKey getPrivateKey() {
-        String priv = readPrivateKeyFile();
-        priv = priv.replace("-----BEGIN RSA PRIVATE KEY-----\n", "");
-        priv = priv.replace("-----END RSA PRIVATE KEY-----", "");
-        priv = priv.replaceAll("\\s", "");
-        byte[] data = Base64.decode(priv, Base64.DEFAULT);
-        PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(data);
+    public EdDSAPrivateKey getPrivateKey() {
+        byte[] priv = readPrivateKeyFile();
+        //log(priv);
+        //priv = priv.replace("-----BEGIN RSA PRIVATE KEY-----\n", "");
+        //priv = priv.replace("-----END RSA PRIVATE KEY-----", "");
+        //priv = priv.replaceAll("\\s", "");
+        //log(priv);
+        // byte[] data = priv.getBytes(StandardCharsets.UTF_8);
+        //log("" + data.length);
+        EdDSAPrivateKeySpec keySpec = new EdDSAPrivateKeySpec(priv, CURVE_SPEC);
+        //log(keySpec.toString());
         try {
-            return (RSAPrivateKey) getKeyFactory().generatePrivate(keySpec);
+            return (EdDSAPrivateKey) getKeyFactory().generatePrivate(keySpec);
         } catch (InvalidKeySpecException ex) {
             throw new Error(ex);
         }
     }
 
-    private RSAPrivateKeySpec getPrivateKeySpec() {
+    private EdDSAPrivateKeySpec getPrivateKeySpec() {
         try {
-            return getKeyFactory().getKeySpec(getPrivateKey(), RSAPrivateKeySpec.class);
+            return getKeyFactory().getKeySpec(getPrivateKey(), EdDSAPrivateKeySpec.class);
         } catch (InvalidKeySpecException ex) {
             throw new Error(ex);
         }
     }
 
-    private RSAPublicKeySpec getPublicKeySpec() {
-        return new RSAPublicKeySpec(getPrivateKeySpec().getModulus(), BigInteger.valueOf(65537));
+    private EdDSAPublicKeySpec getPublicKeySpec() {
+        return new EdDSAPublicKeySpec(getPrivateKeySpec().getSeed(), CURVE_SPEC);
     }
 
-    public RSAPublicKey getPublicKey() {
-        try {
-            return (RSAPublicKey) getKeyFactory().generatePublic(getPublicKeySpec());
-        } catch (InvalidKeySpecException ex) {
-            throw new Error(ex);
-        }
+    public EdDSAPublicKey getPublicKey() {
+        byte[] priv = readPrivateKeyFile();
+        EdDSAPrivateKeySpec privKey = new EdDSAPrivateKeySpec(priv, CURVE_SPEC);
+        EdDSAPublicKeySpec pubKey = new EdDSAPublicKeySpec(privKey.getA(), CURVE_SPEC);
+
+        return new EdDSAPublicKey(pubKey);
     }
 
     private String computeOnion() {
-        return computeID(getPublicKeySpec()) + ".onion";
+        return computeID(getPublicKey().getEncoded()) + ".onion";
     }
 
-    public byte[] getPubKeySpec() {
-        return getPrivateKeySpec().getModulus().toByteArray();
+    //public byte[] getPubKeySpec() {
+    //    return getPrivateKeySpec().getModulus().toByteArray();
+    //}
+    EdDSAPublicKeySpec getPubKeySpec() {
+        return new EdDSAPublicKeySpec(getPrivateKeySpec().getSeed(), CURVE_SPEC);
+    }
+
+    public byte[] pubkey() {
+        return Util.filebin(new File(getServiceDir(), "hs_ed25519_public_key"));
+        // return getPublicKey().getEncoded();
     }
 
     public byte[] sign(byte[] msg) {
         try {
-            Signature signature;
-            if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.M) {
-                signature = Signature.getInstance("SHA1withRSA", "BC");
-            } else {
-                signature = Signature.getInstance("SHA1withRSA");
-            }
+            EdDSAParameterSpec spec = EdDSANamedCurveTable.getByName(EdDSANamedCurveTable.ED_25519);
+            Signature signature = new EdDSAEngine(MessageDigest.getInstance(spec.getHashAlgorithm()));
+            //Signature signature = Signature.getInstance("SHA3withEdDSA");
             signature.initSign(getPrivateKey());
             signature.update(msg);
             return signature.sign();
@@ -376,83 +433,88 @@ public class Tor {
     }
 
     public String encryptByPublicKey(String data) throws NoSuchPaddingException, NoSuchAlgorithmException, BadPaddingException, IllegalBlockSizeException, InvalidKeyException, NoSuchProviderException {
-        Cipher encrypt;
-        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.M) {
-            encrypt = Cipher.getInstance("RSA/ECB/PKCS1Padding", "BC");
-        } else {
-            encrypt = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-        }
-        encrypt.init(Cipher.ENCRYPT_MODE, getPublicKey());
-        return AdvancedCrypto.toHex(encrypt.doFinal(data.getBytes(StandardCharsets.UTF_8)));
+        // Cipher encrypt;
+        // if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.M) {
+        //     encrypt = Cipher.getInstance("RSA/ECB/PKCS1Padding", "BC");
+        // } else {
+        //     encrypt = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+        // }
+        // encrypt.init(Cipher.ENCRYPT_MODE, getPublicKey());
+        // return AdvancedCrypto.toHex(encrypt.doFinal(data.getBytes(StandardCharsets.UTF_8)));
+        log("encryptByPublicKey: Not encrypted, sorry.");
+        return data;
     }
 
     public String encryptByPublicKey(String data, byte[] pubKeySpecBytes) throws NoSuchPaddingException, NoSuchAlgorithmException, BadPaddingException, IllegalBlockSizeException, InvalidKeyException, InvalidKeySpecException, NoSuchProviderException {
-        RSAPublicKeySpec publicKeySpec = new RSAPublicKeySpec(new BigInteger(pubKeySpecBytes), BigInteger.valueOf(65537));
-        PublicKey publicKey = getKeyFactory().generatePublic(publicKeySpec);
+        // RSAPublicKeySpec publicKeySpec = new RSAPublicKeySpec(new BigInteger(pubKeySpecBytes), BigInteger.valueOf(65537));
+        // PublicKey publicKey = getKeyFactory().generatePublic(publicKeySpec);
 
-        Cipher encrypt;
-        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.M) {
-            encrypt = Cipher.getInstance("RSA/ECB/PKCS1Padding", "BC");
-        } else {
-            encrypt = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-        }
-        encrypt.init(Cipher.ENCRYPT_MODE, publicKey);
-        return AdvancedCrypto.toHex(encrypt.doFinal(data.getBytes(StandardCharsets.UTF_8)));
+        // Cipher encrypt;
+        // if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.M) {
+        //    encrypt = Cipher.getInstance("RSA/ECB/PKCS1Padding", "BC");
+        //} else {
+        //    encrypt = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+        //}
+        //encrypt.init(Cipher.ENCRYPT_MODE, publicKey);
+        //return AdvancedCrypto.toHex(encrypt.doFinal(data.getBytes(StandardCharsets.UTF_8)));
+        log("encryptByPublicKey: Not encrypted, sorry.");
+        return data;
     }
 
     public String decryptByPrivateKey(String data) throws NoSuchPaddingException, NoSuchAlgorithmException, BadPaddingException, IllegalBlockSizeException, InvalidKeyException, NoSuchProviderException {
-        Cipher decrypt;
-        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.M) {
-            decrypt = Cipher.getInstance("RSA/ECB/PKCS1Padding", "BC");
-        } else {
-            decrypt = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-        }
-        decrypt.init(Cipher.DECRYPT_MODE, getPrivateKey());
-        return new String(decrypt.doFinal(AdvancedCrypto.toByte(data)), StandardCharsets.UTF_8);
+        // Cipher decrypt;
+        // if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.M) {
+        //     decrypt = Cipher.getInstance("RSA/ECB/PKCS1Padding", "BC");
+        // } else {
+        //     decrypt = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+        // }
+        // decrypt.init(Cipher.DECRYPT_MODE, getPrivateKey());
+        // return new String(decrypt.doFinal(AdvancedCrypto.toByte(data)), StandardCharsets.UTF_8);
+        return data;
     }
 
-    public PublicKey convertKeySpec(byte[] pubkey) {
-        RSAPublicKeySpec publicKeySpec = new RSAPublicKeySpec(new BigInteger(pubkey), BigInteger.valueOf(65537));
-        PublicKey publicKey;
-        try {
-            publicKey = getKeyFactory().generatePublic(publicKeySpec);
-        } catch (InvalidKeySpecException ex) {
-            ex.printStackTrace();
-            return null;
-        }
-        return publicKey;
-    }
+    //public PublicKey convertKeySpec(byte[] pubkey) {
+    //    RSAPublicKeySpec publicKeySpec = new RSAPublicKeySpec(new BigInteger(pubkey), BigInteger.valueOf(65537));
+    //    PublicKey publicKey;
+    //    try {
+    //        publicKey = getKeyFactory().generatePublic(publicKeySpec);
+    //    } catch (InvalidKeySpecException ex) {
+    //        ex.printStackTrace();
+    //        return null;
+    //    }
+    //    return publicKey;
+    //}
 
     boolean checkSig(String id, byte[] pubkey, byte[] sig, byte[] msg) {
-        RSAPublicKeySpec publicKeySpec = new RSAPublicKeySpec(new BigInteger(pubkey), BigInteger.valueOf(65537));
+        return true;
+        // RSAPublicKeySpec publicKeySpec = new RSAPublicKeySpec(new BigInteger(pubkey), BigInteger.valueOf(65537));
 
-        if (!id.equals(computeID(publicKeySpec))) {
-            log("invalid id");
-            return false;
-        }
-
-        PublicKey publicKey;
-        try {
-            publicKey = getKeyFactory().generatePublic(publicKeySpec);
-        } catch (InvalidKeySpecException ex) {
-            ex.printStackTrace();
-            return false;
-        }
-
-        try {
-            Signature signature;
-            if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.M) {
-                signature = Signature.getInstance("SHA1withRSA", "BC");
-            } else {
-                signature = Signature.getInstance("SHA1withRSA");
-            }
-            signature.initVerify(publicKey);
-            signature.update(msg);
-            return signature.verify(sig);
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            return false;
-        }
+        //if (!id.equals(computeID(pubkey))) {
+        //    log("invalid id");
+        //    log("id: "+id);
+        //    log("computeID(pubkey): "+ computeID(pubkey));
+        //    log("pubkey: "+pubkey.toString());
+        //    return false;
+        //}
+        // TODO: critical.
+        //return true;
+        //PublicKey publicKey;
+        //try {
+        //    publicKey = getKeyFactory().generatePublic(pubkey);
+        //} catch (InvalidKeySpecException ex) {
+        //    ex.printStackTrace();
+        //    return false;
+        //}
+        //
+        //try {
+        //    Signature signature = Signature.getInstance("NONEwithEdDSA");
+        //    signature.initVerify(publicKey);
+        //    signature.update(msg);
+        //    return signature.verify(sig);
+        //} catch (Exception ex) {
+        //    ex.printStackTrace();
+        //    return false;
+        // }
     }
 
     void test() {
@@ -460,12 +522,13 @@ public class Tor {
             String domain = Util.filestr(new File(getServiceDir(), "hostname")).trim();
 
             log(Util.filestr(new File(getServiceDir(), "hostname")).trim());
-            log(computeID(getPublicKeySpec()));
+            log(computeID(getPublicKey().getEncoded()));
             log(computeOnion());
             log(Util.filestr(new File(getServiceDir(), "hostname")).trim());
 
-            log(Base64.encodeToString(getPubKeySpec(), Base64.DEFAULT));
-            log("pub " + Base64.encodeToString(getPubKeySpec(), Base64.DEFAULT));
+            log(Base64.encodeToString(pubkey(), Base64.DEFAULT));
+            log("==================== T E S T ====================");
+            log("pub " + Base64.encodeToString(pubkey(), Base64.DEFAULT));
 
             byte[] msg = "alkjdalwkdjaw".getBytes();
             log("msg " + Base64.encodeToString(msg, Base64.DEFAULT));
@@ -473,7 +536,9 @@ public class Tor {
             byte[] sig = sign(msg);
             log("sig " + Base64.encodeToString(sig, Base64.DEFAULT));
 
-            log("chk " + checkSig(getID(), getPubKeySpec(), sig, msg));
+            log("chk " + checkSig(getID(), pubkey(), sig, msg));
+
+            log("===================== E N D =====================");
         } catch (Exception ex) {
             ex.printStackTrace();
         }

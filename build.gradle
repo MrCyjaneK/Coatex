@@ -6,33 +6,54 @@ buildscript {
         google()
         jcenter()
         maven {
-            url 'http://oss.jfrog.org/artifactory/oss-snapshot-local'
+            url 'https://oss.jfrog.org/artifactory/oss-snapshot-local'
         }
         maven { url 'https://jitpack.io' }
         
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:3.6.0'
+        classpath 'com.android.tools.build:gradle:7.1.3'
         classpath "io.realm:realm-gradle-plugin:6.1.0"
-        classpath "com.mikepenz.aboutlibraries.plugin:aboutlibraries-plugin:8.1.1"
+        classpath "com.mikepenz.aboutlibraries.plugin:aboutlibraries-plugin:10.2.0"
         
 
         // NOTE: Do not place your application dependencies here; they belong
         // in the individual module build.gradle files
     }
 }
-
+plugins {
+    id 'org.jetbrains.kotlin.jvm' version '1.7.0-Beta'
+}
 allprojects {
+    ext.kotlin_version = '1.6.21'
     repositories {
         google()
         jcenter()
         maven {
-            url 'http://oss.jfrog.org/artifactory/oss-snapshot-local'
+            url 'https://oss.jfrog.org/artifactory/oss-snapshot-local'
         }
         maven { url 'https://jitpack.io' }
     }
 }
 
-task clean(type: Delete) {
-    delete rootProject.buildDir
+// task clean(type: Delete) {
+//    delete rootProject.buildDir
+// }
+
+
+repositories {
+    mavenCentral()
+}
+dependencies {
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
+}
+compileKotlin {
+    kotlinOptions {
+        jvmTarget = "1.8"
+    }
+}
+compileTestKotlin {
+    kotlinOptions {
+        jvmTarget = "1.8"
+    }
 }

@@ -10,6 +10,8 @@
 
 package com.ivor.coatex.tor;
 
+import static java.lang.System.arraycopy;
+
 import android.content.Context;
 import android.net.LocalServerSocket;
 import android.net.LocalSocket;
@@ -26,6 +28,21 @@ import com.ivor.coatex.db.TorRequest;
 import com.ivor.coatex.utils.Util;
 import com.liulishuo.filedownloader.BaseDownloadTask;
 import com.liulishuo.filedownloader.FileDownloader;
+import net.i2p.crypto.eddsa.EdDSAEngine;
+import net.i2p.crypto.eddsa.EdDSAPrivateKey;
+import net.i2p.crypto.eddsa.EdDSAPublicKey;
+import net.i2p.crypto.eddsa.EdDSASecurityProvider;
+import net.i2p.crypto.eddsa.spec.EdDSANamedCurveSpec;
+import net.i2p.crypto.eddsa.spec.EdDSANamedCurveTable;
+import net.i2p.crypto.eddsa.spec.EdDSAParameterSpec;
+import net.i2p.crypto.eddsa.spec.EdDSAPrivateKeySpec;
+import net.i2p.crypto.eddsa.spec.EdDSAPublicKeySpec;
+import org.spongycastle.crypto.Digest;
+import org.spongycastle.crypto.digests.SHA3Digest;
+import java.nio.charset.Charset;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -257,14 +274,16 @@ public class Server {
             String pubKeySpec = td.getPubKeySpec();
             String signature = td.getSignature();
             log("add target ok");
-            if (!tor.checkSig(
-                    sender,
-                    Util.base64decode(pubKeySpec),
-                    Util.base64decode(signature),
-                    (op + " " + sender + " " + td.getData()).getBytes(StandardCharsets.UTF_8))) {
-                log("add invalid signature");
-                return "" + CODE_INVALID_SIGNATURE;
-            }
+            //if (!tor.checkSig(
+            //        sender,
+            //        Util.base64decode(pubKeySpec),
+            //        Util.base64decode(signature),
+            //        (op + " " + sender + " " + td.getData()).getBytes(StandardCharsets.UTF_8))) {
+            //    log("add invalid signature");
+            //    return "" + CODE_INVALID_SIGNATURE;
+            //}
+            // TODO: Critical
+            log("//TODO: Not verified signature. This is critical.");
             log("add signature ok");
             if (td.getDataType() == TorData.TYPE_REQUEST) {
                 String data = td.getData();
@@ -278,7 +297,7 @@ public class Server {
             } else {
                 log("Not a request message");
             }
-            return "" + Util.base64encode(tor.getPubKeySpec());
+            return "" + Util.base64encode(tor.pubkey());
         }
         if ("msg".equals(tokens[0]) && tokens.length == 2) {
             Gson gson = new Gson();
