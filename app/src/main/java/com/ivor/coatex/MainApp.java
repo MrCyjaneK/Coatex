@@ -112,7 +112,8 @@ public class MainApp extends MultiDexApplication {
                 })
                 .connectTimeout(300, TimeUnit.SECONDS)
                 .dns(s -> Arrays.asList(InetAddress.getByAddress(new byte[]{127, 0, 0, 1})))
-                .connectionSpecs(Collections.singletonList(spec))
+                .connectionSpecs(Arrays.asList(ConnectionSpec.CLEARTEXT,ConnectionSpec.MODERN_TLS))
+                // .connectionSpecs(Collections.singletonList(spec))
                 .readTimeout(300, TimeUnit.SECONDS);
         try {
             TrustManager[] trustManagers = getTrustManagerFactory().getTrustManagers();

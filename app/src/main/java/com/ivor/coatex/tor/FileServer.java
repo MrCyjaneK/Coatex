@@ -64,26 +64,37 @@ public class FileServer extends NanoHTTPD {
     }
 
     public void startServer() throws IOException {
+        Log.d(TAG, "startServer: Starting server!");
         if (!isAlive()) {
+            Log.d(TAG, "startServer: Starting server! - actually yeah.");
             start(NanoHTTPD.SOCKET_READ_TIMEOUT, false);
         }
     }
 
     private void makeServerSecure() throws KeyStoreException, IOException, CertificateException, NoSuchAlgorithmException, UnrecoverableKeyException {
-        File keyStore = new File(mContext.getFilesDir(), "keystore");
-        Tor tor = Tor.getInstance(mContext);
-        if (!keyStore.exists()) {
-            Log.d(TAG, "testFileServer: Creating keystore");
-            CryptoUtils.createKeyStore(keyStore.getAbsolutePath(), tor.getID(), new KeyPair(tor.getPublicKey(), tor.getPrivateKey()));
-        }
+        // File keyStore = new File(mContext.getFilesDir(), "keystore");
+        // Tor tor = Tor.getInstance(mContext);
+        // if (!keyStore.exists()) {
+        //     Log.d(TAG, "testFileServer: Creating keystore");
+        //
+        //    //CryptoUtils.createKeyStore(keyStore.getAbsolutePath(), tor.getID(), new KeyPair(tor.pubkey(), tor.getPrivateKey()));
+        // }
 
-        KeyStore keystore = KeyStore.getInstance(KeyStore.getDefaultType());
-        InputStream keystoreStream = mContext.getAssets().open("certificates/coatex.bks");
+        // KeyStore keystore = KeyStore.getInstance(KeyStore.getDefaultType());
+        // InputStream keystoreStream = mContext.getAssets().open("certificates/coatex.bks");
 
-        keystore.load(keystoreStream, "coatex".toCharArray());
-        KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
-        keyManagerFactory.init(keystore, "coatex".toCharArray());
-        makeSecure(NanoHTTPD.makeSSLSocketFactory(keystore, keyManagerFactory), null);
+        // keystore.load(keystoreStream, "coatex".toCharArray());
+        // KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+        // keyManagerFactory.init(keystore, "coatex".toCharArray());
+        // makeSecure(NanoHTTPD.makeSSLSocketFactory(keystore, keyManagerFactory), null);
+
+        // NOTE: I see no reason to implement whatever is going on here.
+        // Keystore/keymaster/hwsecurity is not what I feel good in, and
+        // I have no intention whatsoever to implement it here.
+        // This comes as a it is because of my ignorance, rather than
+        // logic and facts but unless somebody explain to me why it is
+        // important to use keystore here, I'll work on it. For now stay
+        // slashed out.
     }
 
     @Override
@@ -95,10 +106,11 @@ public class FileServer extends NanoHTTPD {
 //        if(mActivity.isServeFile()) {
 
         File file;
+        Log.d(TAG, "serve: Trying to find file: " + session.getUri());
         if (session.getUri().equals("/dp")) {
             file = new File(Database.getInstance(mContext).get("dp"));
             if (!file.exists()) {
-                return newFixedLengthResponse(Response.Status.FORBIDDEN, "text/*", "Forbidden");
+                return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/*", "Not Found");
             }
         } else {
             Map<String, String> headers = session.getHeaders();
@@ -114,17 +126,17 @@ public class FileServer extends NanoHTTPD {
                     .endGroup()
                     .sort("_id", Sort.DESCENDING).findFirst();
 
-            if (fileShare != null && !fileShare.isServed()) {
+            if (fileShare != null /* && !fileShare.isServed() */) {
                 file = new File(fileShare.getFilePath());
                 if (file.exists()) {
                     Log.d(TAG, "serve: File found serving: " + fileShare.getFilePath());
                 } else {
                     Log.d(TAG, "serve: File not found: " + fileShare.getFilePath());
-                    return newFixedLengthResponse(Response.Status.FORBIDDEN, "text/*", FILE_NOT_FOUND + "");
+                    return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/*", FILE_NOT_FOUND + "");
                 }
             } else {
-                Log.d(TAG, "serve: File not found: " + fn);
-                return newFixedLengthResponse(Response.Status.FORBIDDEN, "text/*", "" + FILE_NOT_SERVABLE);
+                Log.d(TAG, "serve: File not found (fileshare == null): " + fn);
+                return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/*", "" + FILE_NOT_SERVABLE);
             }
             realm.close();
         }

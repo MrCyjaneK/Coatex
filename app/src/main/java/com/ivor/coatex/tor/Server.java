@@ -274,16 +274,16 @@ public class Server {
             String pubKeySpec = td.getPubKeySpec();
             String signature = td.getSignature();
             log("add target ok");
-            //if (!tor.checkSig(
-            //        sender,
-            //        Util.base64decode(pubKeySpec),
-            //        Util.base64decode(signature),
-            //        (op + " " + sender + " " + td.getData()).getBytes(StandardCharsets.UTF_8))) {
-            //    log("add invalid signature");
-            //    return "" + CODE_INVALID_SIGNATURE;
-            //}
+            if (!tor.checkSig(
+                    sender,
+                    Util.base64decode(pubKeySpec),
+                    Util.base64decode(signature),
+                    (op + " " + sender + " " + td.getData()).getBytes(StandardCharsets.UTF_8))) {
+                log("add invalid signature");
+                return "" + CODE_INVALID_SIGNATURE;
+            }
             // TODO: Critical
-            log("//TODO: Not verified signature. This is critical.");
+            // log("//TODO: Not verified signature. This is critical.");
             log("add signature ok");
             if (td.getDataType() == TorData.TYPE_REQUEST) {
                 String data = td.getData();
@@ -389,6 +389,7 @@ public class Server {
         String url = Message.getDownloadUrl(message);
         if (!file.exists()) {
             if (!mDownloadTasks.containsKey(message.getPrimaryKey())) {
+                log("URL:" +url);
                 BaseDownloadTask dt = FileDownloader.getImpl()
                         .create(url)
                         .setPath(mediaFileDir.toString(), true)

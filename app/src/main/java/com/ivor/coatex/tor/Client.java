@@ -94,6 +94,7 @@ public class Client {
         td.setDataType(TorData.TYPE_REQUEST);
 
         TorRequest tr = new TorRequest();
+        // tr.setPublicKey(tor.pubkey());
         tr.setSender(sender);
         tr.setReceiver(receiver);
         tr.setSenderName(n);

@@ -303,6 +303,6 @@ public class Message extends RealmObject {
     }
 
     public static String getDownloadUrl(Message message) {
-        return "https://" + message.getSender() + ".onion:" + Tor.getFileServerPort() + "/" + message.getFileShare().getFilename();
+        return "http://" + message.getSender() + ".onion:" + Tor.getFileServerPort() + "/" + message.getFileShare().getFilename();
     }
 }

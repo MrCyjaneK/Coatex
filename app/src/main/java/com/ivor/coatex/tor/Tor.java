@@ -29,6 +29,11 @@ import net.i2p.crypto.eddsa.spec.EdDSAPrivateKeySpec;
 import net.i2p.crypto.eddsa.spec.EdDSAPublicKeySpec;
 
 import org.apache.commons.codec.binary.Base32;
+import org.bouncycastle.crypto.CryptoException;
+import org.bouncycastle.crypto.Signer;
+import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters;
+import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters;
+import org.bouncycastle.crypto.signers.Ed25519Signer;
 import org.spongycastle.crypto.Digest;
 import org.spongycastle.crypto.digests.SHA3Digest;
 
@@ -263,9 +268,7 @@ public class Tor {
         return mHttpPort;
     }
 
-    public String getOnion() {
-        return mDomain.trim();
-    }
+    public String getOnion() { return mDomain.trim(); }
 
     public String getID() {
         return mDomain.replace(".onion", "").trim();
@@ -361,8 +364,9 @@ public class Tor {
         return full2;
     }
 
-    public EdDSAPrivateKey getPrivateKey() {
-        byte[] priv = readPrivateKeyFile();
+    public Ed25519PrivateKeyParameters getPrivateKey() {
+        return new Ed25519PrivateKeyParameters(readPrivateKeyFile(), 0);
+        //byte[] priv = readPrivateKeyFile();
         //log(priv);
         //priv = priv.replace("-----BEGIN RSA PRIVATE KEY-----\n", "");
         //priv = priv.replace("-----END RSA PRIVATE KEY-----", "");
@@ -370,33 +374,34 @@ public class Tor {
         //log(priv);
         // byte[] data = priv.getBytes(StandardCharsets.UTF_8);
         //log("" + data.length);
-        EdDSAPrivateKeySpec keySpec = new EdDSAPrivateKeySpec(priv, CURVE_SPEC);
+        // EdDSAPrivateKeySpec keySpec = new EdDSAPrivateKeySpec(priv, CURVE_SPEC);
         //log(keySpec.toString());
-        try {
-            return (EdDSAPrivateKey) getKeyFactory().generatePrivate(keySpec);
-        } catch (InvalidKeySpecException ex) {
-            throw new Error(ex);
-        }
+        //try {
+        //    return (EdDSAPrivateKey) getKeyFactory().generatePrivate(keySpec);
+        //} catch (InvalidKeySpecException ex) {
+        //    throw new Error(ex);
+        //}
     }
 
-    private EdDSAPrivateKeySpec getPrivateKeySpec() {
-        try {
-            return getKeyFactory().getKeySpec(getPrivateKey(), EdDSAPrivateKeySpec.class);
-        } catch (InvalidKeySpecException ex) {
-            throw new Error(ex);
-        }
-    }
+    //private EdDSAPrivateKeySpec getPrivateKeySpec() {
+    //    try {
+    //        return getKeyFactory().getKeySpec(getPrivateKey(), EdDSAPrivateKeySpec.class);
+    //    } catch (InvalidKeySpecException ex) {
+    //        throw new Error(ex);
+    //    }
+    //}
 
-    private EdDSAPublicKeySpec getPublicKeySpec() {
-        return new EdDSAPublicKeySpec(getPrivateKeySpec().getSeed(), CURVE_SPEC);
-    }
+    //private EdDSAPublicKeySpec getPublicKeySpec() {
+    //    return new EdDSAPublicKeySpec(getPrivateKeySpec().getSeed(), CURVE_SPEC);
+   // }
 
-    public EdDSAPublicKey getPublicKey() {
-        byte[] priv = readPrivateKeyFile();
-        EdDSAPrivateKeySpec privKey = new EdDSAPrivateKeySpec(priv, CURVE_SPEC);
-        EdDSAPublicKeySpec pubKey = new EdDSAPublicKeySpec(privKey.getA(), CURVE_SPEC);
+    public Ed25519PublicKeyParameters getPublicKey() {
+        // byte[] priv = readPrivateKeyFile();
+        // EdDSAPrivateKeySpec privKey = new EdDSAPrivateKeySpec(priv, CURVE_SPEC);
+        // EdDSAPublicKeySpec pubKey = new EdDSAPublicKeySpec(privKey.getA(), CURVE_SPEC);
+        Ed25519PrivateKeyParameters privateKey = new Ed25519PrivateKeyParameters(readPrivateKeyFile(), 0);
 
-        return new EdDSAPublicKey(pubKey);
+        return privateKey.generatePublicKey();
     }
 
     private String computeOnion() {
@@ -406,26 +411,40 @@ public class Tor {
     //public byte[] getPubKeySpec() {
     //    return getPrivateKeySpec().getModulus().toByteArray();
     //}
-    EdDSAPublicKeySpec getPubKeySpec() {
-        return new EdDSAPublicKeySpec(getPrivateKeySpec().getSeed(), CURVE_SPEC);
-    }
+    //EdDSAPublicKeySpec getPubKeySpec() {
+    //    return new EdDSAPublicKeySpec(getPrivateKeySpec().getSeed(), CURVE_SPEC);
+    //}
 
     public byte[] pubkey() {
-        return Util.filebin(new File(getServiceDir(), "hs_ed25519_public_key"));
-        // return getPublicKey().getEncoded();
+        // return Util.filebin(new File(getServiceDir(), "hs_ed25519_public_key"));
+        log("pubkey: "+getPublicKey().getEncoded());
+        return getPublicKey().getEncoded();
     }
 
     public byte[] sign(byte[] msg) {
+        Ed25519PrivateKeyParameters privateKey = new Ed25519PrivateKeyParameters(readPrivateKeyFile(), 0);
+
+        Signer signer = new Ed25519Signer();
+        signer.init(true, privateKey);
+        signer.update(msg, 0, msg.length);
         try {
-            EdDSAParameterSpec spec = EdDSANamedCurveTable.getByName(EdDSANamedCurveTable.ED_25519);
-            Signature signature = new EdDSAEngine(MessageDigest.getInstance(spec.getHashAlgorithm()));
-            //Signature signature = Signature.getInstance("SHA3withEdDSA");
-            signature.initSign(getPrivateKey());
-            signature.update(msg);
-            return signature.sign();
-        } catch (Exception ex) {
-            throw new Error(ex);
+            byte[] signature = signer.generateSignature();
+            return signature;
+        } catch (CryptoException e) {
+            e.printStackTrace();
         }
+        log("sign(): failed!");
+        return "".getBytes();
+        //try {
+        //    EdDSAParameterSpec spec = EdDSANamedCurveTable.getByName(EdDSANamedCurveTable.ED_25519);
+        //    Signature signature = new EdDSAEngine(MessageDigest.getInstance(spec.getHashAlgorithm()));
+        //    //Signature signature = Signature.getInstance("SHA3withEdDSA");
+        //    signature.initSign(getPrivateKey());
+        //    signature.update(msg);
+        //    return signature.sign();
+        //} catch (Exception ex) {
+        //    throw new Error(ex);
+        //}
     }
 
     public void stop() {
@@ -486,7 +505,20 @@ public class Tor {
     //}
 
     boolean checkSig(String id, byte[] pubkey, byte[] sig, byte[] msg) {
-        return true;
+
+        Signer verifier = new Ed25519Signer();
+        Ed25519PublicKeyParameters publicKey = new Ed25519PublicKeyParameters(pubkey, 0);
+        verifier.init(false, publicKey);
+        verifier.update(msg, 0, msg.length);
+        boolean verified = verifier.verifySignature(sig);
+        log("checkSig(): pubkey: "+pubkey.toString());
+        log("checkSig(): publicKey: "+publicKey.getEncoded().toString());
+        log("checkSig(): sig: "+sig.toString());
+        log("checkSig(): msg: "+msg.toString());
+        log("checkSig(): verified: "+verified);
+
+        return verified;
+        // return true;
         // RSAPublicKeySpec publicKeySpec = new RSAPublicKeySpec(new BigInteger(pubkey), BigInteger.valueOf(65537));
 
         //if (!id.equals(computeID(pubkey))) {
@@ -519,6 +551,8 @@ public class Tor {
 
     void test() {
         try {
+            log("==================== T E S T ====================");
+
             String domain = Util.filestr(new File(getServiceDir(), "hostname")).trim();
 
             log(Util.filestr(new File(getServiceDir(), "hostname")).trim());
@@ -527,18 +561,18 @@ public class Tor {
             log(Util.filestr(new File(getServiceDir(), "hostname")).trim());
 
             log(Base64.encodeToString(pubkey(), Base64.DEFAULT));
-            log("==================== T E S T ====================");
-            log("pub " + Base64.encodeToString(pubkey(), Base64.DEFAULT));
+            log("= pub " + Base64.encodeToString(pubkey(), Base64.DEFAULT));
 
             byte[] msg = "alkjdalwkdjaw".getBytes();
-            log("msg " + Base64.encodeToString(msg, Base64.DEFAULT));
+            log("= msg " + Base64.encodeToString(msg, Base64.DEFAULT));
 
             byte[] sig = sign(msg);
-            log("sig " + Base64.encodeToString(sig, Base64.DEFAULT));
+            log("= sig " + Base64.encodeToString(sig, Base64.DEFAULT));
 
-            log("chk " + checkSig(getID(), pubkey(), sig, msg));
+            log("= chk " + checkSig(getID(), pubkey(), sig, msg));
 
             log("===================== E N D =====================");
+            // System.exit(0);
         } catch (Exception ex) {
             ex.printStackTrace();
         }

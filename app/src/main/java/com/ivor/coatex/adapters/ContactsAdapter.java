@@ -147,7 +147,7 @@ public class ContactsAdapter extends RealmRecyclerViewAdapter<Contact, ContactVi
                         .into(holder.imageView);
             } else {
                 if (Tor.getInstance(mContext).isReady()) {
-                    String url = "https://" + contact.getAddress() + ".onion:" + Tor.getFileServerPort() + "/dp";
+                    String url = "http://" + contact.getAddress() + ".onion:" + Tor.getFileServerPort() + "/dp";
                     FileDownloader.getImpl()
                             .create(url)
                             .setPath(file.getAbsolutePath(), false)
